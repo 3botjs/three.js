@@ -16,7 +16,7 @@ function CylinderGeometry( radiusTop, radiusBottom, height, radialSegments, heig
 	Geometry.call( this );
 
 	this.type = 'CylinderGeometry';
-
+console.log("Foo");
 	this.parameters = {
 		radiusTop: radiusTop,
 		radiusBottom: radiusBottom,
