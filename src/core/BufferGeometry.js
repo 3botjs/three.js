@@ -18,7 +18,7 @@ import { arrayMax } from '../utils.js';
 var bufferGeometryId = 1; // BufferGeometry uses odd numbers as Id
 
 function BufferGeometry() {
-
+console.log("canary");
 	Object.defineProperty( this, 'id', { value: bufferGeometryId += 2 } );
 
 	this.uuid = _Math.generateUUID();
