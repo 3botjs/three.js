@@ -11,7 +11,7 @@ import { Vector3 } from '../math/Vector3.js';
 // BoxGeometry
 
 function BoxGeometry( width, height, depth, widthSegments, heightSegments, depthSegments ) {
-
+console.log("foo");
 	Geometry.call( this );
 
 	this.type = 'BoxGeometry';
