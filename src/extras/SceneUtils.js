@@ -7,7 +7,7 @@ import { Group } from '../objects/Group.js';
  */
 
 var SceneUtils = {
-
+console.log("wasd");
 	createMultiMaterialObject: function ( geometry, materials ) {
 
 		var group = new Group();
