@@ -10,7 +10,7 @@ import { Object3D } from '../core/Object3D.js';
 import { Vector3 } from '../math/Vector3.js';
 
 function Camera() {
-
+console.log("camera canary");
 	Object3D.call( this );
 
 	this.type = 'Camera';
