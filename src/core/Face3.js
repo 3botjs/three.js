@@ -7,7 +7,7 @@ import { Vector3 } from '../math/Vector3.js';
  */
 
 function Face3( a, b, c, normal, color, materialIndex ) {
-console.log("face3foo 44");
+console.log("face3foo 45");
 	this.a = a;
 	this.b = b;
 	this.c = c;
