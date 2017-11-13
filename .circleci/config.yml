@@ -1,67 +1,73 @@
 version: 2
 jobs:
+    checkout_code:
+        docker:
+            - image: circleci/node:7.10
+        working_directory: ~/threejs
+        steps:
+            - checkout
+            - restore_cache:
+                    key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
+            - run npm install
+            - save_cache:
+                    paths:
+                        - ~/threejs
+                    key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
 
-	checkout_code:
-		docker:
-			- image: circleci/node:7.10
-		working_directory: ~/threejs
-		steps:
-			- checkout
-			- restore_cache:
-					key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
-			- run npm install
-			- save_cache:
-					paths:
-						- ~/threejs
-					key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
-
-	get_deps:
-		docker:
-			- image: circleci/node:7.10
-		working_directory: ~/threejs
-		steps:
-			- restore_cache:
-					key: v1-deps-{{ checksum "package.json" }}
-			- run npm install
-			- save_cache:
-					paths:
-						- ~/threejs/node_modules
-					key: v1-deps-{{ checksum "package.json" }}
-		
-	build_monoliths:
-		docker:
-			- image: circleci/node:7.10
-		working_directory: ~/threejs
-		steps:
-			- restore_cache:
-					key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
-			- restore_cache:
-					key: v1-dependencies-{{ checksum "package.json" }}
-			- run: npm run build-uglify
-			- store_artifacts:
-					path: ~/threejs/build/
-					destination: build
-	run_tests:
-		docker:
-			- image: circleci/node:7.10
-		working_directory: ~/threejs
-		steps:
-			- restore_cache:
-					key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
-			- restore_cache:
-					key: v1-dependencies-{{ checksum "package.json" }}
-			- run: npm run build-test
-			- run: npm run test
+    get_deps:
+        docker:
+            - image: circleci/node:7.10
+        working_directory: ~/threejs
+        steps:
+            - restore_cache:
+                    key: v1-deps-{{ checksum "package.json" }}
+            - run npm install
+            - save_cache:
+                    paths:
+                        - ~/threejs/node_modules
+                    key: v1-deps-{{ checksum "package.json" }}
+        
+    build_monoliths:
+        docker:
+            - image: circleci/node:7.10
+        working_directory: ~/threejs
+        steps:
+            - restore_cache:
+                    key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
+            - restore_cache:
+                    key: v1-dependencies-{{ checksum "package.json" }}
+            - run: npm run build-uglify
+            - store_artifacts:
+                    path: ~/threejs/build/
+                    destination: build
+    run_tests:
+        docker:
+            - image: circleci/node:7.10
+        working_directory: ~/threejs
+        steps:
+            - restore_cache:
+                    key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
+            - restore_cache:
+                    key: v1-dependencies-{{ checksum "package.json" }}
+            - run: npm run build-test
+            - run: npm run test
 
 workflows:
-	version: 2
-	build: #-and-deploy:
-	jobs:
-		- checkout_code
-		- get_deps:
-			requires:
-				- checkout_code
-		- build_monoliths:
-			requires:
-				- get_deps
-		- run_tests
+    version: 2
+    build: #-and-deploy:
+    jobs:
+        - checkout_code
+        - get_deps:
+            requires:
+                - checkout_code
+        - build_monoliths:
+            requires:
+                - get_deps
+        - run_tests
+        # - run_tests:
+        #	requires:
+        #		- build_monoliths
+        # - deploy:
+        # 	requires:
+        # 		- rake_test
+        # 		- precompile_assets
