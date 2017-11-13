@@ -34,7 +34,7 @@
     "dev": "concurrently --names \"ROLLUP,HTTP\" -c \"bgBlue.bold,bgGreen.bold\" \"rollup -c -w -m inline\" \"http-server\"",
     "start": "npm run dev",
     "lint": "eslint src",
-    "test": "rollup -c test/rollup.unit.config.js -w",
+    "test": "rollup -c test/rollup.unit.config.js",
     "editor": "electron ./editor/main.js"
   },
   "keywords": [
