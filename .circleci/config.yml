@@ -1,6 +1,6 @@
 version: 2
 jobs:
-  checkout_code:
+    checkout_code:
         docker:
             - image: circleci/node:7.10
         working_directory: ~/threejs
@@ -13,7 +13,6 @@ jobs:
                     paths:
                         - ~/threejs
                     key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
-
     get_deps:
         docker:
             - image: circleci/node:7.10
@@ -26,7 +25,6 @@ jobs:
                     paths:
                         - ~/threejs/node_modules
                     key: v1-deps-{{ checksum "package.json" }}
-        
     build_monoliths:
         docker:
             - image: circleci/node:7.10
