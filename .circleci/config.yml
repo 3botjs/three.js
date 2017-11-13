@@ -50,7 +50,7 @@ jobs:
                     key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
             - restore_cache:
                     key: v1-deps-{{ checksum "package.json" }}
-            - run: rollup -c test/rollup.unit.config.js
+            - run: node_modules/.bin/rollup -c test/rollup.unit.config.js
             - run: npm run test
 
 workflows:
