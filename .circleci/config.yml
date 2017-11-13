@@ -1,44 +1,67 @@
-# Javascript Node CircleCI 2.0 configuration file
-#
-# Check https://circleci.com/docs/2.0/language-javascript/ for more details
-#
 version: 2
 jobs:
-  build:
-    docker:
-      # specify the version you desire here
-      - image: circleci/node:7.10
-      
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/mongo:3.4.4
 
-    working_directory: ~/repo
+	checkout_code:
+		docker:
+			- image: circleci/node:7.10
+		working_directory: ~/threejs
+		steps:
+			- checkout
+			- restore_cache:
+					key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
+			- run npm install
+			- save_cache:
+					paths:
+						- ~/threejs
+					key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
 
-    steps:
-      - checkout
+	get_deps:
+		docker:
+			- image: circleci/node:7.10
+		working_directory: ~/threejs
+		steps:
+			- restore_cache:
+					key: v1-deps-{{ checksum "package.json" }}
+			- run npm install
+			- save_cache:
+					paths:
+						- ~/threejs/node_modules
+					key: v1-deps-{{ checksum "package.json" }}
+		
+	build_monoliths:
+		docker:
+			- image: circleci/node:7.10
+		working_directory: ~/threejs
+		steps:
+			- restore_cache:
+					key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
+			- restore_cache:
+					key: v1-dependencies-{{ checksum "package.json" }}
+			- run: npm run build-uglify
+			- store_artifacts:
+					path: ~/threejs/build/
+					destination: build
+	run_tests:
+		docker:
+			- image: circleci/node:7.10
+		working_directory: ~/threejs
+		steps:
+			- restore_cache:
+					key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
+			- restore_cache:
+					key: v1-dependencies-{{ checksum "package.json" }}
+			- run: npm run build-test
+			- run: npm run test
 
-      # Download and cache dependencies
-      - restore_cache:
-          keys:
-          - v1-dependencies-{{ checksum "package.json" }}
-          # fallback to using the latest cache if no exact match is found
-          - v1-dependencies-
-
-      - run: npm install
-      - run: npm run build
-      - run: npm run build-uglify
-      - run: npm run build-test
-
-      - store_artifacts:
-          path: build/
-          destination: build
-
-      - save_cache:
-          paths:
-            - node_modules
-          key: v1-dependencies-{{ checksum "package.json" }}
-        
-      # run tests!
-      - run: npm run test
+workflows:
+	version: 2
+	build: #-and-deploy:
+	jobs:
+		- checkout_code
+		- get_deps:
+			requires:
+				- checkout_code
+		- build_monoliths:
+			requires:
+				- get_deps
+		- run_tests
