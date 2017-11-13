@@ -73,7 +73,7 @@
 
 		<h3>[page:BufferAttribute normal] (itemSize: 3)</h3>
 		<div>
-		Stores the x, y, and z components of the face or vertex normal vector of each vertex in this geometry.
+		Stores the x, y, and z components of the vertex normal vector of each vertex in this geometry.
 		Set by [page:.fromGeometry]().
 		</div>
 
@@ -315,6 +315,9 @@
 
 		<h3>[method:BufferGeometry setFromObject] ( [page:Object3D object] )</h3>
 		<div>Sets the attributes for this BufferGeometry from an [page:Object3D].</div>
+
+		<h3>[method:BufferGeometry setFromPoints] ( [page:Array points] )</h3>
+		<div>Sets the attributes for this BufferGeometry from an array of points.</div>
 
 		<h3>[method:Object toJSON]()</h3>
 		<div>Returns a JSON object representation of the BufferGeometry.</div>

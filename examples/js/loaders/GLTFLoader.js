@@ -24,7 +24,7 @@ THREE.GLTFLoader = ( function () {
 
 			var scope = this;
 
-			var path = this.path && ( typeof this.path === 'string' ) ? this.path : THREE.Loader.prototype.extractUrlBase( url );
+			var path = this.path !== undefined ? this.path : THREE.Loader.prototype.extractUrlBase( url );
 
 			var loader = new THREE.FileLoader( scope.manager );
 
@@ -68,16 +68,34 @@ THREE.GLTFLoader = ( function () {
 			var content;
 			var extensions = {};
 
-			var magic = convertUint8ArrayToString( new Uint8Array( data, 0, 4 ) );
+			if ( typeof data === 'string' ) {
 
-			if ( magic === BINARY_EXTENSION_HEADER_MAGIC ) {
-
-				extensions[ EXTENSIONS.KHR_BINARY_GLTF ] = new GLTFBinaryExtension( data );
-				content = extensions[ EXTENSIONS.KHR_BINARY_GLTF ].content;
+				content = data;
 
 			} else {
 
-				content = convertUint8ArrayToString( new Uint8Array( data ) );
+				var magic = convertUint8ArrayToString( new Uint8Array( data, 0, 4 ) );
+
+				if ( magic === BINARY_EXTENSION_HEADER_MAGIC ) {
+
+					try {
+
+						extensions[ EXTENSIONS.KHR_BINARY_GLTF ] = new GLTFBinaryExtension( data );
+
+					} catch ( error ) {
+
+						if ( onError ) onError( error );
+						return;
+
+					}
+
+					content = extensions[ EXTENSIONS.KHR_BINARY_GLTF ].content;
+
+				} else {
+
+					content = convertUint8ArrayToString( new Uint8Array( data ) );
+
+				}
 
 			}
 
@@ -85,7 +103,7 @@ THREE.GLTFLoader = ( function () {
 
 			if ( json.asset === undefined || json.asset.version[ 0 ] < 2 ) {
 
-				onError( new Error( 'THREE.GLTFLoader: Unsupported asset. glTF versions >=2.0 are supported.' ) );
+				if ( onError ) onError( new Error( 'THREE.GLTFLoader: Unsupported asset. glTF versions >=2.0 are supported.' ) );
 				return;
 
 			}
@@ -116,7 +134,7 @@ THREE.GLTFLoader = ( function () {
 
 			var parser = new GLTFParser( json, extensions, {
 
-				path: path || this.path,
+				path: path || this.path || '',
 				crossOrigin: this.crossOrigin,
 				manager: this.manager
 
@@ -782,12 +800,12 @@ THREE.GLTFLoader = ( function () {
 
 					} else {
 
-							// <= r87. Remove when reasonable.
+						// <= r87. Remove when reasonable.
 
-							offset = uvScaleMap.offset;
-							repeat = uvScaleMap.repeat;
+						offset = uvScaleMap.offset;
+						repeat = uvScaleMap.repeat;
 
-							uniforms.offsetRepeat.value.set( offset.x, offset.y, repeat.x, repeat.y );
+						uniforms.offsetRepeat.value.set( offset.x, offset.y, repeat.x, repeat.y );
 
 					}
 
@@ -1017,11 +1035,9 @@ THREE.GLTFLoader = ( function () {
 
 				if ( value ) {
 
-					fns.push( value );
-
 					if ( value instanceof Promise ) {
 
-						value.then( function ( key, value ) {
+						value = value.then( function ( key, value ) {
 
 							results[ key ] = value;
 
@@ -1032,6 +1048,8 @@ THREE.GLTFLoader = ( function () {
 						results[ idx ] = value;
 
 					}
+
+					fns.push( value );
 
 				}
 
@@ -1049,11 +1067,9 @@ THREE.GLTFLoader = ( function () {
 
 					if ( value ) {
 
-						fns.push( value );
-
 						if ( value instanceof Promise ) {
 
-							value.then( function ( key, value ) {
+							value = value.then( function ( key, value ) {
 
 								results[ key ] = value;
 
@@ -1064,6 +1080,8 @@ THREE.GLTFLoader = ( function () {
 							results[ key ] = value;
 
 						}
+
+						fns.push( value );
 
 					}
 
@@ -1109,7 +1127,7 @@ THREE.GLTFLoader = ( function () {
 		}
 
 		// Relative URL
-		return ( path || '' ) + url;
+		return path + url;
 
 	}
 
@@ -1333,6 +1351,7 @@ THREE.GLTFLoader = ( function () {
 	GLTFParser.prototype.parse = function ( onLoad, onError ) {
 
 		var json = this.json;
+		var parser = this;
 
 		// Clear the loader cache
 		this.cache.removeAll();
@@ -1341,43 +1360,19 @@ THREE.GLTFLoader = ( function () {
 		this._withDependencies( [
 
 			'scenes',
-			'cameras',
 			'animations'
 
 		] ).then( function ( dependencies ) {
 
-			var scenes = [];
+			var scenes = dependencies.scenes || [];
+			var scene = scenes[ json.scene || 0 ];
+			var animations = dependencies.animations || [];
 
-			for ( var i = 0; i < dependencies.scenes.length; i ++ ) {
+			parser.getDependencies( 'camera' ).then( function ( cameras ) {
 
-				scenes.push( dependencies.scenes[ i ] );
+				onLoad( scene, scenes, cameras, animations );
 
-			}
-
-			var scene = json.scene !== undefined ? dependencies.scenes[ json.scene ] : scenes[ 0 ];
-
-			var cameras = [];
-
-			dependencies.cameras = dependencies.cameras || [];
-
-			for ( var i = 0; i < dependencies.cameras.length; i ++ ) {
-
-				var camera = dependencies.cameras[ i ];
-				cameras.push( camera );
-
-			}
-
-			var animations = [];
-
-			dependencies.animations = dependencies.animations || [];
-
-			for ( var i = 0; i < dependencies.animations.length; i ++ ) {
-
-				animations.push( dependencies.animations[ i ] );
-
-			}
-
-			onLoad( scene, scenes, cameras, animations );
+			} ).catch( onError );
 
 		} ).catch( onError );
 
@@ -1407,6 +1402,24 @@ THREE.GLTFLoader = ( function () {
 	};
 
 	/**
+	 * Requests all dependencies of the specified type asynchronously, with caching.
+	 * @param {string} type
+	 * @return {Promise<Array<Object>>}
+	 */
+	GLTFParser.prototype.getDependencies = function ( type ) {
+
+		var parser = this;
+		var defs = this.json[ type + 's' ] || [];
+
+		return Promise.all( defs.map( function ( def, index ) {
+
+			return parser.getDependency( type, index );
+
+		} ) );
+
+	};
+
+	/**
 	 * Specification: https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#buffers-and-buffer-views
 	 * @param {number} bufferIndex
 	 * @return {Promise<ArrayBuffer>}
@@ -1418,7 +1431,7 @@ THREE.GLTFLoader = ( function () {
 
 		if ( bufferDef.type && bufferDef.type !== 'arraybuffer' ) {
 
-			throw new Error( 'THREE.GLTFLoader: %s buffer type is not supported.', bufferDef.type );
+			throw new Error( 'THREE.GLTFLoader: ' + bufferDef.type + ' buffer type is not supported.' );
 
 		}
 
@@ -1435,7 +1448,7 @@ THREE.GLTFLoader = ( function () {
 
 			loader.load( resolveURL( bufferDef.uri, options.path ), resolve, undefined, function () {
 
-				reject( new Error( 'THREE.GLTFLoader: Buffer "' + bufferDef.uri + '" not found.' ) );
+				reject( new Error( 'THREE.GLTFLoader: Failed to load buffer "' + bufferDef.uri + '".' ) );
 
 			} );
 
@@ -1478,6 +1491,7 @@ THREE.GLTFLoader = ( function () {
 				var elementBytes = TypedArray.BYTES_PER_ELEMENT;
 				var itemBytes = elementBytes * itemSize;
 				var byteStride = json.bufferViews[ accessor.bufferView ].byteStride;
+				var normalized = accessor.normalized === true;
 				var array;
 
 				// The buffer is not interleaved if the stride is the item size in bytes.
@@ -1489,13 +1503,13 @@ THREE.GLTFLoader = ( function () {
 					// Integer parameters to IB/IBA are in array elements, not bytes.
 					var ib = new THREE.InterleavedBuffer( array, byteStride / elementBytes );
 
-					return new THREE.InterleavedBufferAttribute( ib, itemSize, accessor.byteOffset / elementBytes );
+					return new THREE.InterleavedBufferAttribute( ib, itemSize, accessor.byteOffset / elementBytes, normalized );
 
 				} else {
 
 					array = new TypedArray( bufferView, accessor.byteOffset, accessor.count * itemSize );
 
-					return new THREE.BufferAttribute( array, itemSize );
+					return new THREE.BufferAttribute( array, itemSize, normalized );
 
 				}
 
@@ -1696,7 +1710,7 @@ THREE.GLTFLoader = ( function () {
 
 				if ( alphaMode === ALPHA_MODES.MASK ) {
 
-					materialParams.alphaTest = material.alphaCutoff || 0.5;
+					materialParams.alphaTest = material.alphaCutoff !== undefined ? material.alphaCutoff : 0.5;
 
 				}
 
@@ -2028,43 +2042,39 @@ THREE.GLTFLoader = ( function () {
 
 	/**
 	 * Specification: https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#cameras
+	 * @param {number} cameraIndex
+	 * @return {Promise<THREE.Camera>}
 	 */
-	GLTFParser.prototype.loadCameras = function () {
+	GLTFParser.prototype.loadCamera = function ( cameraIndex ) {
 
-		var json = this.json;
+		var camera;
+		var cameraDef = this.json.cameras[ cameraIndex ];
+		var params = cameraDef[ cameraDef.type ];
 
-		return _each( json.cameras, function ( camera ) {
+		if ( ! params ) {
 
-			var _camera;
+			console.warn( 'THREE.GLTFLoader: Missing camera parameters.' );
+			return;
 
-			var params = camera[ camera.type ];
+		}
 
-			if ( ! params ) {
+		if ( cameraDef.type === 'perspective' ) {
 
-				console.warn( 'THREE.GLTFLoader: Missing camera parameters.' );
-				return;
+			var aspectRatio = params.aspectRatio || 1;
+			var xfov = params.yfov * aspectRatio;
 
-			}
+			camera = new THREE.PerspectiveCamera( THREE.Math.radToDeg( xfov ), aspectRatio, params.znear || 1, params.zfar || 2e6 );
 
-			if ( camera.type === 'perspective' ) {
+		} else if ( cameraDef.type === 'orthographic' ) {
 
-				var aspectRatio = params.aspectRatio || 1;
-				var xfov = params.yfov * aspectRatio;
+			camera = new THREE.OrthographicCamera( params.xmag / - 2, params.xmag / 2, params.ymag / 2, params.ymag / - 2, params.znear, params.zfar );
 
-				_camera = new THREE.PerspectiveCamera( THREE.Math.radToDeg( xfov ), aspectRatio, params.znear || 1, params.zfar || 2e6 );
+		}
 
-			} else if ( camera.type === 'orthographic' ) {
+		if ( cameraDef.name !== undefined ) camera.name = cameraDef.name;
+		if ( cameraDef.extras ) camera.userData = cameraDef.extras;
 
-				_camera = new THREE.OrthographicCamera( params.xmag / - 2, params.xmag / 2, params.ymag / 2, params.ymag / - 2, params.znear, params.zfar );
-
-			}
-
-			if ( camera.name !== undefined ) _camera.name = camera.name;
-			if ( camera.extras ) _camera.userData = camera.extras;
-
-			return _camera;
-
-		} );
+		return Promise.resolve( camera );
 
 	};
 
@@ -2232,7 +2242,7 @@ THREE.GLTFLoader = ( function () {
 
 		// Nothing in the node definition indicates whether it is a Bone or an
 		// Object3D. Use the skins' joint references to mark bones.
-		for ( var skinIndex in skins ) {
+		for ( var skinIndex = 0; skinIndex < skins.length; skinIndex ++ ) {
 
 			var joints = skins[ skinIndex ].joints;
 
@@ -2249,7 +2259,7 @@ THREE.GLTFLoader = ( function () {
 		// references and rename instances below.
 		//
 		// Example: CesiumMilkTruck sample model reuses "Wheel" meshes.
-		for ( var nodeIndex in nodes ) {
+		for ( var nodeIndex = 0; nodeIndex < nodes.length; nodeIndex ++ ) {
 
 			var nodeDef = nodes[ nodeIndex ];
 
@@ -2261,7 +2271,7 @@ THREE.GLTFLoader = ( function () {
 
 				}
 
-				meshReferences[ nodeDef.mesh ]++;
+				meshReferences[ nodeDef.mesh ] ++;
 
 			}
 
@@ -2287,7 +2297,7 @@ THREE.GLTFLoader = ( function () {
 
 					if ( meshReferences[ nodeDef.mesh ] > 1 ) {
 
-						mesh.name += '_instance_' + meshUses[ nodeDef.mesh ]++;
+						mesh.name += '_instance_' + meshUses[ nodeDef.mesh ] ++;
 
 					}
 
@@ -2295,7 +2305,7 @@ THREE.GLTFLoader = ( function () {
 
 				} else if ( nodeDef.camera !== undefined ) {
 
-					return dependencies.cameras[ nodeDef.camera ];
+					return scope.getDependency( 'camera', nodeDef.camera );
 
 				} else if ( nodeDef.extensions
 								 && nodeDef.extensions[ EXTENSIONS.KHR_LIGHTS ]
