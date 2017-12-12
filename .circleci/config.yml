@@ -1,40 +1,92 @@
-# Javascript Node CircleCI 2.0 configuration file
-#
-# Check https://circleci.com/docs/2.0/language-javascript/ for more details
-#
 version: 2
+
+defaults: &defaults
+  working_directory: ~/threejs
+  docker:
+    - image: circleci/node:7.10
+
 jobs:
-  build:
-    docker:
-      # specify the version you desire here
-      - image: circleci/node:7.10
-      
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/mongo:3.4.4
+    checkout_code:
+        <<: *defaults
+        steps:
+            - checkout
+            - save_cache:
+                    paths:
+                        - ~/threejs
+                    key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
 
-    working_directory: ~/repo
+    get_deps:
+        <<: *defaults
+        steps:
+            - restore_cache:
+                    key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
+            - restore_cache:
+                    key: v1-deps-{{ checksum "package.json" }}
+            - run: npm install
+            - save_cache:
+                    paths:
+                        - ~/threejs/node_modules
+                    key: v1-deps-{{ checksum "package.json" }}
 
-    steps:
-      - checkout
+    chrome_test:
+        <<: *defaults
+        steps:
+            - restore_cache:
+                    key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
+            - restore_cache:
+                    key: v1-deps-{{ checksum "package.json" }}
+            - run: mkdir chromeless
+            - run: cd chromeless
+            - run: wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            - run: sudo dpkg -i google-chrome-stable_current_amd64.deb
+            - run: sudo apt-get -f -y install
+            - run: sudo dpkg -i google-chrome-stable_current_amd64.deb
+            - run: sudo apt -y install screen
+            - run: npm install chromeless
+            - run: curl https://pastebin.com/raw/920MYh2A > test.js
+            - run: node test.js
+            - run: ip addr
+            - run: curl --upload-file /tmp/cj*.png https://transfer.sh/circle-no-chrome.png
+            - store_artifacts:
+                    path: /tmp/
+                    destination: screens
 
-      # Download and cache dependencies
-      - restore_cache:
-          keys:
-          - v1-dependencies-{{ checksum "package.json" }}
-          # fallback to using the latest cache if no exact match is found
-          - v1-dependencies-
+    build_monoliths:
+        <<: *defaults
+        steps:
+            - restore_cache:
+                    key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
+            - restore_cache:
+                    key: v1-deps-{{ checksum "package.json" }}
+            - run: npm run build-uglify
+            - store_artifacts:
+                    path: ~/threejs/build/
+                    destination: build
 
-      - run: npm install
-      - run: npm run build
-      - run: npm run build-uglify
-      - run: npm run build-test
+    run_tests:
+        <<: *defaults
+        steps:
+            - restore_cache:
+                    key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
+            - restore_cache:
+                    key: v1-deps-{{ checksum "package.json" }}
+            - run: node_modules/.bin/rollup -c test/rollup.unit.config.js
+            - run: npm run test
 
-      - save_cache:
-          paths:
-            - node_modules
-          key: v1-dependencies-{{ checksum "package.json" }}
-        
-      # run tests!
-      - run: npm run test
+workflows:
+    version: 2
+    build:
+        jobs:
+            - checkout_code
+            - get_deps:
+                requires:
+                    - checkout_code
+            - build_monoliths:
+                requires:
+                    - get_deps
+            - chrome_test:
+                requires:
+                    - get_deps
+            - run_tests:
+                requires:
+                    - build_monoliths
