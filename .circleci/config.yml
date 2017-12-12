@@ -38,6 +38,7 @@ jobs:
             - run: mkdir chromeless
             - run: cd chromeless
             - run: wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            - run: set +e
             - run: sudo dpkg -i google-chrome-stable_current_amd64.deb
             - run: sudo apt-get -f -y install
             - run: sudo dpkg -i google-chrome-stable_current_amd64.deb
@@ -47,6 +48,7 @@ jobs:
             - run: node test.js
             - run: ip addr
             - run: curl --upload-file /tmp/cj*.png https://transfer.sh/circle-no-chrome.png
+            - run: set -e
             - store_artifacts:
                     path: /tmp/
                     destination: screens
