@@ -48,6 +48,7 @@ jobs:
                     sudo apt -y install screen
                     npm install chromeless
                     curl https://pastebin.com/raw/920MYh2A > test.js
+                    google-chrome --disable-gpu-vsync --disable-renderer-backgrounding --headless --remote-debugging-port=9222 &
                     node test.js
                     ip addr
                     curl --upload-file /tmp/cj*.png https://transfer.sh/circle-no-chrome.png
