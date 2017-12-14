@@ -12,7 +12,7 @@ function AudioAnalyser( audio, fftSize ) {
 	audio.getOutput().connect( this.analyser );
 
 }
-
+console.log("audiofoo");
 Object.assign( AudioAnalyser.prototype, {
 
 	getFrequencyData: function () {
